@@ -8,21 +8,40 @@
 ## work to utilize a configuration file.
 ################################################################
 
+## Get packages
+list.of.deps <- c("BiocManager", "Gviz", "openxlsx", "stringr", "getopt")
+new.packages <- list.of.deps[!(list.of.deps %in% installed.packages()[,"Package"])]
+if(length(new.packages)) {
+  print(new.packages)
+  if(new.packages == "Gviz") {
+    BiocManager::install("Gviz")
+  } else {
+  install.packages(new.packages, repos = list(CRAN="http://cran.rstudio.com/"))
+	}
+}
+
 ## pull needed packages
 library(Gviz)
 library(openxlsx)
 library(stringr)
 library(getopt)
 
-## Parse options from stdin
+## Help table
 spec = matrix(c(
-  'help','h',0,"logical","Help screen",
-  'inFile','i',1,"character","xlsx file to feed",
-  'outFile','i',1,"character","pdf file output"
+  'help'   ,'h',0,"logical"  ,"Help screen",
+  'inFile' ,'i',1,"character","xlsx file to feed",
+  'outFile','o',1,"character","pdf file output"
 ), byrow=TRUE, ncol=5)
+opt = getopt(spec)
+
+## Print help message if no options given or if help is called
+if(!is.null(opt$help)) {
+  cat(getopt(spec, usage=TRUE))
+  q(status=1)
+}
 
 ## set working directory
-infile.config = '/Users/travisjensen/Desktop/Working/capstone/working_copies/TimeVizConfig.xlsx'
+infile.config = opt$inFile
 
 #######################
 ##
@@ -34,7 +53,8 @@ infile.config = '/Users/travisjensen/Desktop/Working/capstone/working_copies/Tim
 config = read.xlsx(infile.config,sheet='Configuration')
 
 ## parse
-out.file = config$Value[config$Variable.Name=='Output PDF']
+#out.file = config$Value[config$Variable.Name=='Output PDF']
+out.file = opt$outFile
 out.height = as.numeric(config$Value[config$Variable.Name=='Output Height'])
 out.width = as.numeric(config$Value[config$Variable.Name=='Output Width'])
 main = config$Value[config$Variable.Name=='Main Title']
