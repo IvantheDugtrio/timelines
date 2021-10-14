@@ -1,2 +1,2 @@
 # timelines
-Timelines project for UMGC BIFS 670
+Timelines project for UMGC BIOT 670
