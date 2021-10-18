@@ -8,11 +8,65 @@
 ## work to utilize a configuration file.
 ################################################################
 
+## Set CRAN repo to download and install packages from
+CRAN="http://cran.rstudio.com/"
+
+## Install getopt first for working help menu
+list.of.deps <- c("getopt")
+new.packages <- list.of.deps[!(list.of.deps %in% installed.packages()[,"Package"])]
+if(length(new.packages)) {
+  cat("Checking if",new.packages,"is installed\n")
+  install.packages(new.packages, repos = list(CRAN="http://cran.rstudio.com/"))
+}
+
+## Load getopt to display help menu
+library(getopt)
+
+## Help table
+spec = matrix(c(
+  'help'   ,'h',0,"logical"  ,"Help screen",
+  'inFile' ,'i',1,"character","XLSX file to feed",
+  'outFile','o',1,"character","PDF output"
+), byrow=TRUE, ncol=5)
+opt = getopt(spec)
+
+help = "
+R Libraries Required:
+* Biocmanager
+* * Gviz
+* openxlsx
+* stringr
+* getopt
+
+XLSX Sheet 1 'Configuration' Format
+* Must be named 'Configuration'
+* Column 1\tVariable name\t\tFixed (required tracks)
+* Column 2\tVariable description\tnot parsed
+* Column 3\tValue(s)\t\tMust match variable name (required)
+
+XLSX Sheets 2-n 'Data and Annotation Tracks 1-n' Format
+* Sheet names must match values in 'Track List' variable list
+* Defined by the 'Track *' variables in a semicolon-separated lists
+* * (Excludes 'Track Box Width' variable)
+* 'Data *' variables define how data tracks are merged in plots
+* First column must be 'Time Ranges' and be semicolon separated
+* * i.e. Time range: 0;20
+* Rows represent different time ranges
+* Columns 2-n must be data or annotation columns
+\n"
+
+## Print help message if no options given or if help is called
+if(!is.null(opt$help)) {
+  cat(getopt(spec, usage=TRUE))
+  cat(help)
+  q(status=1)
+}
+
 ## Get packages
 list.of.deps <- c("BiocManager", "Gviz", "openxlsx", "stringr", "getopt")
 new.packages <- list.of.deps[!(list.of.deps %in% installed.packages()[,"Package"])]
 if(length(new.packages)) {
-  print(new.packages)
+  cat("Checking if",new.packages,"is installed\n")
   if(new.packages == "Gviz") {
     BiocManager::install("Gviz")
   } else {
@@ -24,24 +78,6 @@ if(length(new.packages)) {
 library(Gviz)
 library(openxlsx)
 library(stringr)
-library(getopt)
-
-## Help table
-spec = matrix(c(
-  'help'   ,'h',0,"logical"  ,"Help screen",
-  'inFile' ,'i',1,"character","xlsx file to feed",
-  'outFile','o',1,"character","pdf file output"
-), byrow=TRUE, ncol=5)
-opt = getopt(spec)
-
-## Print help message if no options given or if help is called
-if(!is.null(opt$help)) {
-  cat(getopt(spec, usage=TRUE))
-  q(status=1)
-}
-
-## set working directory
-infile.config = opt$inFile
 
 #######################
 ##
@@ -50,11 +86,22 @@ infile.config = opt$inFile
 #######################
 
 ## import XLSX sheet 1 (configuration)
+if(!file.exists(opt$inFile)){
+  cat("Error, ")
+  cat(opt$inFile,"does not exist\n")
+  q(status=1)
+}
+infile.config = opt$inFile
 config = read.xlsx(infile.config,sheet='Configuration')
 
 ## parse
 #out.file = config$Value[config$Variable.Name=='Output PDF']
 out.file = opt$outFile
+if(file.exists(out.file)){
+  cat("Error, ")
+  cat(out.file,"already exists. Please use a different file name\n")
+  q(status=1)
+}
 out.height = as.numeric(config$Value[config$Variable.Name=='Output Height'])
 out.width = as.numeric(config$Value[config$Variable.Name=='Output Width'])
 main = config$Value[config$Variable.Name=='Main Title']
@@ -72,6 +119,27 @@ track.label.sizes = as.numeric(unlist(str_split(config$Value[config$Variable.Nam
 data.types = unlist(str_split(config$Value[config$Variable.Name=='Data Type'],';'))
 data.groups = unlist(str_split(config$Value[config$Variable.Name=='Data Groups'],';'))
 data.aggs = unlist(str_split(config$Value[config$Variable.Name=='Data Aggregate'],';'))
+
+## Validate config
+## Verify all required track lists have the same number of elements
+## Use track.sheet.names and data.types as the expected counts
+lenTrackSheetNames = length(track.sheet.names)
+lenTrackTypes = length(track.types)
+lenTrackHeights = length(track.heights)
+lenTrackNames = length(track.names)
+lenTrackBoxColors = length(track.box.colors)
+lenTrackBGColor = length(track.bg.color)
+lenTrackLabelColors = length(track.label.colors)
+lenTrackLabelSizes = length(track.label.sizes)
+lenDataTypes = length(data.types)
+lenDataGroups = length(data.groups)
+lenDataAggs = length(data.aggs)
+expectTrackLen = lenTrackSheetNames
+if(lenTrackTypes != expectTrackLen){
+  cat("track.types should have ")
+  cat(expectTrackLen,"values\n")
+  q(status=1)
+}
 
 #######################
 ##
