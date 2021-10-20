@@ -110,6 +110,7 @@ track.width = as.numeric(config$Value[config$Variable.Name=='Track Box Width'])
 from.to = as.numeric(unlist(str_split(config$Value[config$Variable.Name=='From To'],';')))
 track.sheet.names = unlist(str_split(config$Value[config$Variable.Name=='Track List'],';'))
 track.types = unlist(str_split(config$Value[config$Variable.Name=='Track Type'],';'))
+track.shapes= unlist(str_split(config$Value[config$Variable.Name=='Track Shapes'],';'))
 track.heights = as.numeric(unlist(str_split(config$Value[config$Variable.Name=='Track Heights'],';')))
 track.names = unlist(str_split(config$Value[config$Variable.Name=='Track Names'],';'))
 track.box.colors = unlist(str_split(config$Value[config$Variable.Name=='Track Box Color'],';'))
@@ -154,6 +155,7 @@ data.count = 1
 ## for each track do
 for (i in 1:length(track.types)) {
     track.type = track.types[i]
+    track.shape = track.shapes[i]
     track.sheet.name = track.sheet.names[i]
     track.name = gsub('\\\\n','\n',track.names[i])
     track.box.color = track.box.colors[i]
@@ -228,11 +230,19 @@ for (i in 1:length(track.types)) {
         ## plot an annotation track
         ## wishlist: how to stagger annotations better? input for box shape, ellipse, arrows...etc, 
         ## plot annotation label above/below/on box, 
-        plot.list[[i]] = AnnotationTrack(start = starts, end = ends, chromosome = "chrX", strand = rep("*",length(starts)), 
-            id = gsub('\\\\n','\n',config.annot$Annotation.Name), name = track.name, shape = "box", featureAnnotation = "id",
-            group=group.factor, stacking="squish",fontcolor.feature=config.annot$Annotation.Label.Color,cex.feature=config.annot$Annotation.Label.Size,
-            fill=config.annot$Annotation.Color, background.title=track.box.color, background.panel=track.bg.color, 
-            fontcolor.title=track.label.color, cex.title=track.label.size)
+        if (track.shape=='arrow') {
+          plot.list[[i]] = AnnotationTrack(start=starts,end=ends,chromosome="chrX",strand=rep("+",length(starts)), 
+              id=gsub('\\\\n','\n',config.annot$Annotation.Name),name=track.name,shape="arrow",featureAnnotation="id",
+              group=group.factor, stacking="squish",collapse=TRUE,fontcolor.feature=config.annot$Annotation.Label.Color,cex.feature=config.annot$Annotation.Label.Size,
+              fill=config.annot$Annotation.Color,background.title=track.box.color,background.panel=track.bg.color, 
+              fontcolor.title=track.label.color,cex.title=track.label.size)
+        } else if (track.shape=='box') {
+          plot.list[[i]] = AnnotationTrack(start=starts,end=ends,chromosome="chrX",strand=rep("*",length(starts)), 
+            id=gsub('\\\\n','\n',config.annot$Annotation.Name),name=track.name,shape="box",featureAnnotation="id",
+            group=group.factor,stacking="squish",fontcolor.feature=config.annot$Annotation.Label.Color,cex.feature=config.annot$Annotation.Label.Size,
+            fill=config.annot$Annotation.Color,background.title=track.box.color,background.panel=track.bg.color, 
+            fontcolor.title=track.label.color,cex.title=track.label.size)
+        }
       
     } else { ## invalid input track type -- exit with non-zero status
         print(paste0("Please provide valid track type.  The given track type is not valid: ",track.type))
