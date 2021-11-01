@@ -113,8 +113,7 @@ config = read.xlsx(infile.config,sheet='Configuration')
 #out.file = config$Value[config$Variable.Name=='Output PDF']
 out.file = opt$outFile
 if(file.exists(out.file)){
-    writeLog(paste0("Error, ",out.file," already exists. Please use a different file name"))
-    q(status=1)
+    out.file = paste0(out.file,".1.pdf")
 }
 
 # Parse config table in xlsx file
@@ -137,23 +136,23 @@ data.types = unlist(str_split(config$Value[config$Variable.Name=='Data Type'],';
 data.groups = unlist(str_split(config$Value[config$Variable.Name=='Data Groups'],';'))
 data.aggs = unlist(str_split(config$Value[config$Variable.Name=='Data Aggregate'],';'))
 
-## Additional config fields from Seth
-main.trackLabelPosition = config$Value[config$Variable.Name=='Timeline Track Label Position']
-main.trackDirection = as.numeric(config$Value[config$Variable.Name=='Track Directions'])
-main.trackLittleTicks = as.numeric(config$Value[config$Variable.Name=='Track Little Ticks'])
-main.trackLineWidth = as.numeric(config$Value[config$Variable.Name=='Track Line Width'])
-main.trackShowID = as.numeric(config$Value[config$Variable.Name=='Track Show ID'])
-main.trackCexID = as.numeric(config$Value[config$Variable.Name=='Track Cex ID'])
-main.trackYAxisTicks = config$Value[config$Variable.Name=='Track Y-axis Ticks']
-main.dataBoxRatio = as.numeric(config$Value[config$Variable.Name=='Data Box Ratio'])
-main.dataTrackGrid = as.numeric(config$Value[config$Variable.Name=='Data Track Grid'])
-main.dataLegend = as.numeric(config$Value[config$Variable.Name=='Data Legend'])
-main.trackShape = config$Value[config$Variable.Name=='Shape Annotation']
-main.trackAnnotationGroup = config$Value[config$Variable.Name=='Track Directions']
-main.groupLabel = config$Value[config$Variable.Name=='Group Labels']
-main.trackLineType = as.numeric(config$Value[config$Variable.Name=='Track Line Type'])
-main.trackLineWidth = as.numeric(config$Value[config$Variable.Name=='Track Line Width'])
-main.showID = config$Value[config$Variable.Name=='Show ID']
+time.labelPosition = config$Value[config$Variable.Name=='Timeline Track Label Position']
+track.direction.35 = as.logical(config$Value[config$Variable.Name=='Track Directions'])
+track.direction.53 = as.logical(config$Value[config$Variable.Name=='Track Directions'])
+track.littleTicks = as.logical(config$Value[config$Variable.Name=='Track Little Ticks'])
+track.lineWidth = as.numeric(config$Value[config$Variable.Name=='Track Line Width'])
+track.showID = as.logical(config$Value[config$Variable.Name=='Track Show ID'])
+track.cexID = as.numeric(config$Value[config$Variable.Name=='Track Cex ID'])
+track.yAxisTicks = config$Value[config$Variable.Name=='Track Y-axis Ticks']
+data.boxRatio = as.numeric(config$Value[config$Variable.Name=='Data Box Ratio'])
+data.trackGrid = as.logical(config$Value[config$Variable.Name=='Data Track Grid'])
+data.legend = as.logical(config$Value[config$Variable.Name=='Data Legend'])
+track.shapeAnnotation = config$Value[config$Variable.Name=='Shape Annotation']
+track.annotationGroup = config$Value[config$Variable.Name=='Track Annotation Group']
+track.groupLabel = config$Value[config$Variable.Name=='Group Labels']
+track.lineType = as.numeric(config$Value[config$Variable.Name=='Track Line Type'])
+track.lineWidth = as.numeric(config$Value[config$Variable.Name=='Track Line Width'])
+main.showID = as.logical(config$Value[config$Variable.Name=='Show ID'])
 
 ## Validate config
 ## Verify all required track lists have the same number of elements
@@ -209,7 +208,12 @@ for (i in 1:length(track.types)) {
             background.title=track.box.color,
             background.panel=track.bg.color,
             fontcolor.title=track.label.color,
-            cex.title=track.label.size)
+            cex.title=track.label.size,
+            labelPos=time.labelPosition,
+            littleTicks=track.littleTicks,
+            lwd=track.lineWidth,
+            showId=track.showID,
+            cex.id=track.cexID)
     
     ## Data track
     } else if (track.type=='data') {
@@ -218,10 +222,7 @@ for (i in 1:length(track.types)) {
         data.agg = data.aggs[data.count]
         
         ## Import sheet to get label
-        config.data = read.xlsx(
-            infile.config,
-            sheet=track.sheet.name
-        )
+        config.data = read.xlsx(infile.config,sheet=track.sheet.name)
       
         ## determine starts and stops
         starts = as.numeric(unlist(lapply(str_split(config.data$Time.Ranges,';'),function(x){x[1]})))
@@ -245,7 +246,11 @@ for (i in 1:length(track.types)) {
                 background.title=track.box.color,
                 background.panel=track.bg.color,
                 fontcolor.title=track.label.color,
-                cex.title=track.label.size)
+                cex.title=track.label.size,
+                yTicksAt=track.yAxisTicks,
+                box.ratio=data.boxRatio,
+                grid=data.trackGrid,
+                legend=data.legend)
           
         } else {
             
@@ -284,9 +289,7 @@ for (i in 1:length(track.types)) {
     } else if (track.type=='annotation') {
       
         ## Import sheet to get label
-        config.annot = read.xlsx(
-            infile.config,
-            sheet=track.sheet.name)
+        config.annot = read.xlsx(infile.config,sheet=track.sheet.name)
       
         ## determine starts and stops
         starts = as.numeric(unlist(lapply(str_split(config.annot$Time.Ranges,';'),function(x){x[1]})))
@@ -305,7 +308,7 @@ for (i in 1:length(track.types)) {
             strand=rep("*",length(starts)), 
             id=gsub('\\\\n','\n',config.annot$Annotation.Name),
             name=track.name,
-            shape=main.trackShape,
+            shape=track.shapeAnnotation,
             featureAnnotation="id",
             group=group.factor,
             stacking="squish",
@@ -315,7 +318,13 @@ for (i in 1:length(track.types)) {
             background.title=track.box.color,
             background.panel=track.bg.color, 
             fontcolor.title=track.label.color,
-            cex.title=track.label.size)
+            cex.title=track.label.size,
+            shape=track.shapeAnnotation,
+            just.group=track.groupLabel,
+            groupAnnotation=track.annotationGroup,
+            lty=track.lineType,
+            lwd=track.lineWidth,
+            showId=main.showID)
       
     } else { ## invalid input track type -- exit with non-zero status
         writeLog(paste0("Please provide valid track type. The given track type is not valid: ",track.type))
@@ -338,16 +347,11 @@ pdf(
 writeLog("Plotting tracks")
 plotTracks(
     plot.list,
-    from = from.to[1],
-    to = from.to[2],
-    cex.main=main.size,
-    cex.id=main.trackCexID,
-    main=main.title,
-    labelPos=main.trackLabelPosition,
-    littleTicks=main.trackLittleTicks,
-    lwd=main.trackLineWidth,
+    from=from.to[1],
+    to=from.to[2],
     sizes=track.heights,
-    yTicksAt=main.trackYAxisTicks,
+    main=main.title,
+    cex.main=main.size,
     title.width=track.width)
 
 dev.off()
