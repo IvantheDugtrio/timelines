@@ -20,14 +20,14 @@ getDeps <- function(deps){
         if(new.packages=="Gviz") {
             BiocManager::install("Gviz")
         } else {
-            install.packages(new.packages,repos=list(CRAN))
+            suppressMessages(install.packages(new.packages,repos=list(CRAN)))
 	    }
 	} else {
 	    print(paste0(deps," is already installed"))	    
 	}
     for(pkg in deps){
         print(paste0("Loading ",pkg))
-        library(pkg,character.only=TRUE)
+        suppressPackageStartupMessages(library(pkg,character.only=TRUE))
     }
 }
 
