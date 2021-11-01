@@ -17,14 +17,13 @@ getDeps <- function(deps){
     new.packages <- deps[!(deps %in% installed.packages()[,"Package"])]
     if(length(new.packages)){
         print(paste0(new.packages," is/are to be installed"))
-        if(new.packages == "Gviz") {
+        if(new.packages=="Gviz") {
             BiocManager::install("Gviz")
         } else {
-            install.packages(new.packages, repos = list(CRAN))
+            install.packages(new.packages,repos=list(CRAN))
 	    }
-        
-    } else {
-        print("No new packages to be installed")
+	} else {
+	    print(paste0(deps," is already installed"))	    
 	}
     for(pkg in deps){
         print(paste0("Loading ",pkg))
@@ -35,11 +34,13 @@ getDeps <- function(deps){
 ## Help table function
 helpMenu <- function(){
     spec = matrix(c(
-        'help'   ,'h',0,"logical"  ,"Help screen",
-        'inFile' ,'i',1,"character","XLSX file to feed",
-        'outFile','o',1,"character","PDF output"
-    ), byrow=TRUE, ncol=5)
-    opt = getopt(spec)
+        'help'     ,'h',0,"logical"  ,"Help screen",
+        'inFile'   ,'i',1,"character","XLSX file to feed",
+        'outFile'  ,'o',1,"character","PDF output",
+        'verbosity','v',2,"integer"  ,"Verbose logging (optional), default 0",
+        'log'      ,'l',2,"character","Log file (optional)"
+    ),byrow=TRUE,ncol=5)
+    opt=getopt(spec)
 
     help = "
     R Libraries Required:
@@ -67,18 +68,30 @@ helpMenu <- function(){
     \n"
 
 ## Print help message if no options given or if help is called
-    if(!is.null(opt$help)) {
+    if(!is.null(opt$help)||(is.null(opt$help)&&(is.null(opt$inFile)||is.null(opt$outFile)))) {
         cat(getopt(spec, usage=TRUE))
         cat(help)
         q(status=1)
     }
+    if(is.null(opt$verbosity)){opt$verbosity=0}
     return(opt)
+}
+
+## Write strings to log file as they are called
+writeLog <- function(message){
+    if(opt$verbosity>0){
+        print(message)
+        if(!is.null(opt$log)){
+            lapply(c(message),write,opt$log,append=TRUE)
+        }
+    }
 }
 
 ## Script starts here
 ## Pull needed packages in the required order
 getDeps(c("getopt"))
 opt <- helpMenu()
+    
 ## Load Gviz afterwards because it takes the longest to load
 getDeps(c("BiocManager","Gviz","openxlsx","stringr"))
 
@@ -90,7 +103,7 @@ getDeps(c("BiocManager","Gviz","openxlsx","stringr"))
 
 ## import XLSX sheet 1 (configuration)
 if(!file.exists(opt$inFile)){
-    print(paste0("Error, ",opt$inFile," does not exist"))
+    writeLog(paste0("Error, ",opt$inFile," does not exist"))
     q(status=1)
 }
 infile.config = opt$inFile
@@ -100,9 +113,12 @@ config = read.xlsx(infile.config,sheet='Configuration')
 #out.file = config$Value[config$Variable.Name=='Output PDF']
 out.file = opt$outFile
 if(file.exists(out.file)){
-    print(paste0("Error, ",out.file," already exists. Please use a different file name"))
+    writeLog(paste0("Error, ",out.file," already exists. Please use a different file name"))
     q(status=1)
 }
+
+# Parse config table in xlsx file
+writeLog(paste0("Importing configuration"))
 out.height = as.numeric(config$Value[config$Variable.Name=='Output Height'])
 out.width = as.numeric(config$Value[config$Variable.Name=='Output Width'])
 main.title = config$Value[config$Variable.Name=='Main Title']
@@ -122,9 +138,9 @@ data.groups = unlist(str_split(config$Value[config$Variable.Name=='Data Groups']
 data.aggs = unlist(str_split(config$Value[config$Variable.Name=='Data Aggregate'],';'))
 
 ## Additional config fields from Seth
-main.trackLabelPos = config$Value[config$Variable.Name=='Timeline Track Label Position']
+main.trackLabelPosition = config$Value[config$Variable.Name=='Timeline Track Label Position']
 main.trackDirection = as.numeric(config$Value[config$Variable.Name=='Track Directions'])
-main.trackTicks = as.numeric(config$Value[config$Variable.Name=='Track Little Ticks'])
+main.trackLittleTicks = as.numeric(config$Value[config$Variable.Name=='Track Little Ticks'])
 main.trackLineWidth = as.numeric(config$Value[config$Variable.Name=='Track Line Width'])
 main.trackShowID = as.numeric(config$Value[config$Variable.Name=='Track Show ID'])
 main.trackCexID = as.numeric(config$Value[config$Variable.Name=='Track Cex ID'])
@@ -142,6 +158,7 @@ main.showID = config$Value[config$Variable.Name=='Show ID']
 ## Validate config
 ## Verify all required track lists have the same number of elements
 ## Use track.sheet.names and data.types as the expected counts
+writeLog(paste0("Validating delimited configuration sections"))
 lenTrackSheetNames = length(track.sheet.names)
 lenTrackTypes = length(track.types)
 lenTrackHeights = length(track.heights)
@@ -155,8 +172,7 @@ lenDataGroups = length(data.groups)
 lenDataAggs = length(data.aggs)
 expectTrackLen = lenTrackSheetNames
 if(lenTrackTypes != expectTrackLen){
-    cat("track.types should have ")
-    cat(expectTrackLen,"values\n")
+    writeLog(paste0("track.types should have ",expectTrackLen," values"))
     q(status=1)
 }
 
@@ -180,6 +196,8 @@ for (i in 1:length(track.types)) {
     track.box.color = track.box.colors[i]
     track.label.color = track.label.colors[i]
     track.label.size = track.label.sizes[i]
+    
+    writeLog(paste0("Processing track: ",track.name))
     
     ## determine track type and append track to list object
     if (track.type=='time') {
@@ -300,7 +318,7 @@ for (i in 1:length(track.types)) {
             cex.title=track.label.size)
       
     } else { ## invalid input track type -- exit with non-zero status
-        print(paste0("Please provide valid track type. The given track type is not valid: ",track.type))
+        writeLog(paste0("Please provide valid track type. The given track type is not valid: ",track.type))
         quit(status=3) ## non 0 exit status
     }
 }
@@ -311,18 +329,25 @@ for (i in 1:length(track.types)) {
 ##
 #######################
 
+writeLog("Creating PDF")
 pdf(
     out.file,
     height=out.height,
     width=out.width)
 
+writeLog("Plotting tracks")
 plotTracks(
     plot.list,
     from = from.to[1],
     to = from.to[2],
-    sizes=track.heights,
-    main=main.title,
     cex.main=main.size,
+    cex.id=main.trackCexID,
+    main=main.title,
+    labelPos=main.trackLabelPosition,
+    littleTicks=main.trackLittleTicks,
+    lwd=main.trackLineWidth,
+    sizes=track.heights,
+    yTicksAt=main.trackYAxisTicks,
     title.width=track.width)
 
 dev.off()
