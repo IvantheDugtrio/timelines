@@ -23,12 +23,12 @@ getDeps <- function(deps){
             suppressMessages(install.packages(new.packages,repos=list(CRAN)))
 	    }
 	} else {
-	    print(paste0(deps," is already installed"))	    
+	    for(pkg in deps[(deps %in% installed.packages()[,"Package"])]){
+	        print(paste0(pkg," is already installed"))
+	        print(paste0("Loading ",pkg))
+            suppressPackageStartupMessages(library(pkg,character.only=TRUE))
+	    }
 	}
-    for(pkg in deps){
-        print(paste0("Loading ",pkg))
-        suppressPackageStartupMessages(library(pkg,character.only=TRUE))
-    }
 }
 
 ## Help table function
@@ -147,7 +147,7 @@ track.yAxisTicks = config$Value[config$Variable.Name=='Track Y-axis Ticks']
 data.boxRatio = as.numeric(config$Value[config$Variable.Name=='Data Box Ratio'])
 data.trackGrid = as.logical(config$Value[config$Variable.Name=='Data Track Grid'])
 data.legend = as.logical(config$Value[config$Variable.Name=='Data Legend'])
-track.shapeAnnotation = config$Value[config$Variable.Name=='Shape Annotation']
+track.shapeAnnotation = unlist(str_split(config$Value[config$Variable.Name=='Shape Annotation'],';'))
 track.annotationGroup = config$Value[config$Variable.Name=='Track Annotation Group']
 track.groupLabel = config$Value[config$Variable.Name=='Group Labels']
 track.lineType = as.numeric(config$Value[config$Variable.Name=='Track Line Type'])
@@ -162,16 +162,38 @@ lenTrackSheetNames = length(track.sheet.names)
 lenTrackTypes = length(track.types)
 lenTrackHeights = length(track.heights)
 lenTrackNames = length(track.names)
-lenTrackBoxColors = length(track.box.colors)
+lenTrackBoxColor = length(track.box.colors)
 lenTrackBGColor = length(track.bg.color)
-lenTrackLabelColors = length(track.label.colors)
-lenTrackLabelSizes = length(track.label.sizes)
+lenTrackLabelColor = length(track.label.colors)
+lenTrackLabelSize = length(track.label.sizes)
 lenDataTypes = length(data.types)
 lenDataGroups = length(data.groups)
 lenDataAggs = length(data.aggs)
+lenShapeAnno = length(track.shapeAnnotation)
 expectTrackLen = lenTrackSheetNames
 if(lenTrackTypes != expectTrackLen){
-    writeLog(paste0("track.types should have ",expectTrackLen," values"))
+    writeLog(paste0("Track Type should have ",expectTrackLen," values"))
+    q(status=1)
+} else if(lenTrackHeights != expectTrackLen){
+    writeLog(paste0("Track Heights should have ",expectTrackLen," values"))
+    q(status=1)
+} else if(lenTrackNames != expectTrackLen){
+    writeLog(paste0("Track Names should have ",expectTrackLen," values"))
+    q(status=1)
+} else if(lenTrackBoxColor != expectTrackLen){
+    writeLog(paste0("Track Box Color should have ",expectTrackLen," values"))
+    q(status=1)
+} else if(lenTrackBGColor != expectTrackLen){
+    writeLog(paste0("Track Background Color should have ",expectTrackLen," values"))
+    q(status=1)
+} else if(lenTrackLabelColor != expectTrackLen){
+    writeLog(paste0("Track Label Color should have ",expectTrackLen," values"))
+    q(status=1)
+} else if(lenTrackLabelSize != expectTrackLen){
+    writeLog(paste0("Track Label Size should have ",expectTrackLen," values"))
+    q(status=1)
+} else if(lenShapeAnno != expectTrackLen){
+    writeLog(paste0("Shape Annotation should have ",expectTrackLen," values"))
     q(status=1)
 }
 
@@ -195,6 +217,7 @@ for (i in 1:length(track.types)) {
     track.box.color = track.box.colors[i]
     track.label.color = track.label.colors[i]
     track.label.size = track.label.sizes[i]
+    track.shape = track.shapeAnnotation[i]
     
     writeLog(paste0("Processing track: ",track.name))
     
@@ -262,7 +285,6 @@ for (i in 1:length(track.types)) {
                     name = track.name,
                     groups = data.group,
                     type = data.type,
-                    aggregateGroups = FALSE,
                     background.title=track.box.color,
                     background.panel=track.bg.color,
                     fontcolor.title=track.label.color,
@@ -286,18 +308,54 @@ for (i in 1:length(track.types)) {
         data.count = data.count + 1
         
     ## annotation Track
+    } else if (track.type=='details') {
+      
+        ## Import sheet to get label
+        config.details = read.xlsx(infile.config,sheet=track.sheet.name)
+
+        ## determine starts and stops
+        starts = as.numeric(unlist(lapply(str_split(config.details$Time.Ranges,';'),function(x){x[1]})))
+        ends = as.numeric(unlist(lapply(str_split(config.details$Time.Ranges,';'),function(x){x[2]})))
+
+        ## get grouping factor
+        group.factor = as.numeric(as.factor(config.details$Details.Name))
+
+        ## plot an annotation track
+        plot.list[[i]] = AnnotationTrack(
+            start=starts,
+            end=ends,
+            chromosome="chrX",
+            strand=rep("+",length(starts)), 
+            id=gsub('\\\\n','\n',config.details$Details.Name),
+            name=track.name,
+            shape="arrow",
+            featureAnnotation="id",
+            group=group.factor,
+            stacking="squish",
+            collapse=TRUE,
+            fontcolor.feature=config.details$Details.Label.Color,
+            cex.feature=config.details$Details.Label.Size,
+            fill=config.details$Details.Color,
+            background.title=track.box.color,
+            background.panel=track.bg.color, 
+            fontcolor.title=track.label.color,
+            cex.title=track.label.size)
+          
+      ## annotation Track
     } else if (track.type=='annotation') {
       
         ## Import sheet to get label
         config.annot = read.xlsx(infile.config,sheet=track.sheet.name)
-      
+
         ## determine starts and stops
         starts = as.numeric(unlist(lapply(str_split(config.annot$Time.Ranges,';'),function(x){x[1]})))
         ends = as.numeric(unlist(lapply(str_split(config.annot$Time.Ranges,';'),function(x){x[2]})))
-        
+
         ## get grouping factor
         group.factor = as.numeric(as.factor(config.annot$Annotation.Name))
-        
+        collapse = FALSE
+        if(track.shape=="arrow"){collapse=TRUE}
+
         ## plot an annotation track
         ## wishlist: how to stagger annotations better? input for box shape, ellipse, arrows...etc, 
         ## plot annotation label above/below/on box, 
@@ -308,23 +366,18 @@ for (i in 1:length(track.types)) {
             strand=rep("*",length(starts)), 
             id=gsub('\\\\n','\n',config.annot$Annotation.Name),
             name=track.name,
-            shape=track.shapeAnnotation,
+            shape="box",
             featureAnnotation="id",
             group=group.factor,
             stacking="squish",
+            collapse=FALSE,
             fontcolor.feature=config.annot$Annotation.Label.Color,
             cex.feature=config.annot$Annotation.Label.Size,
             fill=config.annot$Annotation.Color,
             background.title=track.box.color,
             background.panel=track.bg.color, 
             fontcolor.title=track.label.color,
-            cex.title=track.label.size,
-            shape=track.shapeAnnotation,
-            just.group=track.groupLabel,
-            groupAnnotation=track.annotationGroup,
-            lty=track.lineType,
-            lwd=track.lineWidth,
-            showId=main.showID)
+            cex.title=track.label.size)
       
     } else { ## invalid input track type -- exit with non-zero status
         writeLog(paste0("Please provide valid track type. The given track type is not valid: ",track.type))
