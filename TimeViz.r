@@ -227,6 +227,7 @@ for (i in 1:length(track.types)) {
         ## initialize an axis track and add to plot list object
         ## wishlist: add ticksAt (minor/major ticks based on time units), figure out how to add the title - currently not working
         plot.list[[i]] = GenomeAxisTrack(
+            showTitle=TRUE,
             name=track.name,
             background.title=track.box.color,
             background.panel=track.bg.color,
